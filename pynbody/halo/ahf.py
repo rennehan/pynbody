@@ -15,7 +15,7 @@ class AHFCatalogue(HaloCatalogue):
     """
 
     def __init__(self, sim, make_grp=None, get_all_parts=None, use_iord=None, ahf_basename=None,
-                 dosort=None, only_stat=None, write_fpos=True, **kwargs):
+                 dosort=None, only_stat=None, write_fpos=True, ahf_mpi=None, **kwargs):
         """Initialize an AHFCatalogue.
 
         **kwargs** :
@@ -71,6 +71,12 @@ class AHFCatalogue(HaloCatalogue):
         else:
             self._ahfBasename = util.cutgz(
                 glob.glob(sim._filename + '*z*AHF_halos*')[0])[:-5]
+
+        # D. Rennehan: Need to know if AHF was run in mpi mode
+        if ahf_mpi is not None:
+            self._ahfMPI = ahf_mpi
+        else:
+            raise ValueError("You MUST set ahf_mpi to True or False depending on if MPI was used in AHF calculations. True assumes that the files were concatenated directly.")
 
         try:
             f = util.open_(self._ahfBasename + 'halos')
@@ -271,7 +277,7 @@ class AHFCatalogue(HaloCatalogue):
 
         return load(self.base.filename, take=ids)
 
-    def _get_file_positions(self,filename):
+    def _get_file_positions(self, filename):
         """Get the starting positions of each halo's particle information within the
         AHF_particles file for faster access later"""
         if os.path.exists(self._ahfBasename + 'fpos'):
@@ -281,12 +287,27 @@ class AHFCatalogue(HaloCatalogue):
             f.close()
         else:
             f = util.open_(filename)
-            for h in xrange(self._nhalos):
-                if len((f.readline().split())) == 1:
-                    f.readline()
-                self._halos[h+1].properties['fstart'] = f.tell()
-                for i in xrange(self._halos[h+1].properties['npart']):
-                    f.readline()
+            # D. Rennehan: Do everything as before if not MPI-AHF
+            if not self._ahfMPI:
+                for h in xrange(self._nhalos):
+                    if len((f.readline().split())) == 1:
+                        f.readline()
+                    self._halos[h+1].properties['fstart'] = f.tell()
+                    for i in xrange(self._halos[h+1].properties['npart']):
+                        f.readline()
+            else:
+                for h in range(self._nhalos):
+                    line = f.readline()
+                    split_line = line.split()
+                    while len(split_line) == 1:
+                        line = f.readline()
+                        split_line = line.split()
+
+                    # Should be no PartType above 5, so it must be a large halo ID
+                    if int(split_line[1]) > 5:
+                        self._halos[h + 1].properties['fstart'] = f.tell()
+                    for j in range(self._halos[h+1].properties['npart']):
+                        f.readline()
             f.close()
 
     def _load_ahf_particle_block(self, f, nparts=None):
