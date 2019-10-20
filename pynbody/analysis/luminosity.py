@@ -95,7 +95,11 @@ def calc_mags(simstars, band='v', cmd_path=None):
 
     age_star = simstars['age'].in_units('yr')
     # allocate temporary metals that we can play with
-    metals = simstars['metals'][:, 0] # D. Rennehan: Had to add this for GIZMO HDF5 snapshots
+    try:
+        metals = simstars['metals'][:, 0] # D. Rennehan: Had to add this for GIZMO HDF5 snapshots
+    except:
+        metals = simstars['metals']
+
     # get values off grid to minmax
     age_star[np.where(age_star < np.min(lums['ages']))] = np.min(lums['ages'])
     age_star[np.where(age_star > np.max(lums['ages']))] = np.max(lums['ages'])
