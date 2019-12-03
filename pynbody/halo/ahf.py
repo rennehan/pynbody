@@ -15,7 +15,7 @@ class AHFCatalogue(HaloCatalogue):
     """
 
     def __init__(self, sim, make_grp=None, get_all_parts=None, use_iord=None, ahf_basename=None,
-                 dosort=None, only_stat=None, write_fpos=True, ahf_mpi=None, **kwargs):
+                 dosort=None, only_stat=None, write_fpos=True, ahf_mpi=None, ahf_part_path=None, **kwargs):
         """Initialize an AHFCatalogue.
 
         **kwargs** :
@@ -90,13 +90,20 @@ class AHFCatalogue(HaloCatalogue):
         f.close()
         logger.info("AHFCatalogue loading particles")
 
-        self._load_ahf_particles(self._ahfBasename + 'particles')
+        # D. Rennehan: Can load much faster on SSD on cluster
+        if self.ahf_part_path is not None:
+            self._load_ahf_particles(self.ahf_part_path)
+        else:
+            self._load_ahf_particles(self._ahfBasename + 'particles')
 
         logger.info("AHFCatalogue loading halos")
         self._load_ahf_halos(self._ahfBasename + 'halos')
 
         if self._only_stat is None:
-            self._get_file_positions(self._ahfBasename + 'particles')
+            if self.ahf_part_path is not None:
+                self._get_file_positions(self.ahf_part_path)
+            else:
+                self._get_file_positions(self._ahfBasename + 'particles')
 
         if self._dosort is not None:
             nparr = np.array([self._halos[i+1].properties['npart'] for i in range(self._nhalos)])
@@ -197,7 +204,10 @@ class AHFCatalogue(HaloCatalogue):
             hcnt = hcnt[::-1]
 
         if self._all_parts is None:
-            f = util.open_(self._ahfBasename+'particles')
+            if self.ahf_part_path is not None:
+                f = util.open_(self.ahf_part_path)
+            else:
+                f = util.open_(self._ahfBasename+'particles')
 
         cnt = 0
         ar = np.empty(len(target),dtype=np.int32)
@@ -267,7 +277,10 @@ class AHFCatalogue(HaloCatalogue):
         if self._dosort is not None:
             i = self._sorted_indices[i-1]
 
-        f = util.open_(self._ahfBasename + 'particles')
+        if self.ahf_part_path is not None:
+            f = util.open_(self.ahf_part_path)
+        else:
+            f = util.open_(self._ahfBasename + 'particles')
 
         fpos = self._halos[i].properties['fstart']
         f.seek(fpos,0)
@@ -596,6 +609,10 @@ class AHFCatalogue(HaloCatalogue):
 
     @staticmethod
     def _can_load(sim,ahf_basename=None,**kwargs):
+        if self.ahf_part_path is not None:
+            if os.path.exists(self.ahf_part_path):
+                return True
+
         if ahf_basename is not None:
             for file in glob.glob(ahf_basename + '*particles*'):
                 if os.path.exists(file):
