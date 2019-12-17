@@ -91,7 +91,8 @@ class AHFCatalogue(HaloCatalogue):
         logger.info("AHFCatalogue loading particles")
 
         # D. Rennehan: Can load much faster on SSD on cluster
-        if self.ahf_part_path is not None:
+        self.ahf_part_path = ahf_part_path
+        if ahf_part_path is not None:
             self._load_ahf_particles(self.ahf_part_path)
         else:
             self._load_ahf_particles(self._ahfBasename + 'particles')
